@@ -1,0 +1,36 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Models / data
+.hf_cache/
+eval/data/*.pdf
+eval/data/*.PDF
+eval/data/**/*.pdf
+eval/data/meta_*.json
+
+# Qdrant local storage
+qdrant_storage/
+
+# Redis local storage
+redis_data/
+
+# Runtime / logs
+logs/
+.chainlit/
+.files/
+data/chainlit.db
+data/highlights/
+data/thread_docs.json
+
+# OS
+.DS_Store
+

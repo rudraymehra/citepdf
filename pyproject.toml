@@ -1,0 +1,86 @@
+[project]
+name = "pdf-rag"
+version = "0.1.0"
+description = "PDF-Constrained Conversational RAG Agent (Task 3)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # LLM provider
+    "anthropic>=0.40.0,<1.0",
+    # PDF parsing / layout
+    "docling>=2.16.0,<3.0",
+    "pymupdf>=1.24.0,<2.0",
+    # Embeddings + reranker (BGE-M3 dense+sparse, bge-reranker-v2-m3)
+    "FlagEmbedding>=1.3.0,<2.0",
+    "torch>=2.4.0,<3.0",
+    # transformers 5.x dropped XLMRobertaTokenizer.prepare_for_model which
+    # FlagEmbedding's reranker code path still calls. Pin to v4 until
+    # FlagEmbedding catches up.
+    "transformers>=4.45,<5.0",
+    "tokenizers>=0.20,<1.0",
+    # FastEmbed BM25 model — Qdrant/bm25 produces classical BM25 sparse
+    # vectors. Used as the 3rd retrieval channel alongside BGE-M3 dense + sparse.
+    "fastembed>=0.4.0,<1.0",
+    # PDF page rendering for bbox-highlighted citation thumbnails.
+    "pillow>=10.0,<12.0",
+    # Vector DB
+    "qdrant-client>=1.12.0,<2.0",
+    # Language detection
+    "fast-langdetect>=0.2.0,<1.0",
+    # API
+    "fastapi>=0.115.0,<1.0",
+    "uvicorn[standard]>=0.31.0,<1.0",
+    "sse-starlette>=2.1.0,<3.0",
+    "python-multipart>=0.0.12,<1.0",
+    "httpx>=0.27.0,<1.0",
+    # Frontend
+    "streamlit>=1.40.0,<2.0",
+    "chainlit>=1.3.0,<3.0",
+    # RAPTOR clustering
+    "umap-learn>=0.5.7,<1.0",
+    "scikit-learn>=1.5.0,<2.0",
+    "numpy>=1.26,<3.0",
+    # Async ingestion worker
+    "arq>=0.26.0,<1.0",
+    "redis>=5.0.0,<7.0",
+    # Chainlit persistent thread storage (SQLite for local, Postgres-ready).
+    # The [asyncio] extra pulls in greenlet, which SQLAlchemy needs for async ops.
+    "sqlalchemy[asyncio]>=2.0,<3.0",
+    "greenlet>=3.0,<4.0",
+    "aiosqlite>=0.20.0,<1.0",
+    # Config + utils
+    "pydantic>=2.8.0,<3.0",
+    "pydantic-settings>=2.5.0,<3.0",
+    "pyyaml>=6.0,<7.0",
+    "python-dotenv>=1.0.0,<2.0",
+    "rich>=13.9.0,<14.0",
+    # Eval
+    "ragas>=0.2.0,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0,<9.0",
+    "pytest-asyncio>=0.24.0,<1.0",
+    "ruff>=0.7.0,<1.0",
+]
+
+[project.scripts]
+pdf-ingest = "packages.ingest.ingest:main"
+
+[tool.uv]
+package = false
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["packages", "apps"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
