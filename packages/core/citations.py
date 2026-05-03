@@ -44,11 +44,17 @@ def chunks_to_documents(
         section = c.section_label or "?"
         title = f"chunk {i} | {page_label} | {section}"[:200]
 
+        # Strip leading heading line if it just duplicates `section`. The
+        # chunker prepends heading text to the chunk; section is also in
+        # the document title. Without this strip, Claude bolds the heading
+        # line AND emits its own heading, producing visible duplicates.
+        chunk_text = _strip_leading_heading(c.text, c.section_label)
+
         block: dict[str, Any] = {
             "type": "document",
             "source": {
                 "type": "content",
-                "content": [{"type": "text", "text": c.text}],
+                "content": [{"type": "text", "text": chunk_text}],
             },
             "title": title,
             "context": _context_for(c),
@@ -62,6 +68,36 @@ def chunks_to_documents(
             block["cache_control"] = {"type": "ephemeral"}
         docs.append(block)
     return docs
+
+
+def _strip_leading_heading(text: str, section_label: str) -> str:
+    """Drop the first line if it's a likely-heading that duplicates the section.
+
+    Heading detection: the first non-empty line is short (≤80 chars), has no
+    sentence-ending period, and either matches the section label or looks
+    like a heading (title case, no inline punctuation that suggests prose).
+    """
+    if not text:
+        return text
+    text = text.lstrip()
+    nl = text.find("\n")
+    first = (text[:nl] if nl >= 0 else text).strip()
+    rest = (text[nl + 1 :] if nl >= 0 else "").lstrip()
+    if not first or len(first) > 80:
+        return text
+
+    # Cheap heading heuristics:
+    #  - matches the section label (case-insensitive substring either way), OR
+    #  - has no period inside (.,;:!?) and looks like a heading
+    section_norm = (section_label or "").strip().lower()
+    first_norm = first.lower().strip("*# ")
+    if section_norm and (
+        first_norm in section_norm or section_norm in first_norm
+    ):
+        return rest or text
+    if not any(ch in first for ch in ".!?") and len(first.split()) <= 10:
+        return rest or text
+    return text
 
 
 def _context_for(c: RetrievedChunk) -> str:

@@ -279,22 +279,38 @@ async def on_message(message: cl.Message) -> None:
     mode = cl.user_session.get("mode") or "instant"
     history = cl.user_session.get("history") or []
 
-    answer = cl.Message(content="")
-    await answer.send()
+    # Don't pre-send an empty message — Chainlit's stream_token + content-mutation
+    # race-condition produces visible duplicates ("Il cannot answer..."). Send the
+    # message once we have its first byte (text token or refusal), then accumulate
+    # via stream_token only.
+    answer: cl.Message | None = None
     citation_elements: list[cl.Text] = []
     warnings_collected: list[str] = []
     is_refusal = False
+
+    async def _ensure_message() -> cl.Message:
+        nonlocal answer
+        if answer is None:
+            answer = cl.Message(content="")
+            await answer.send()
+        return answer
 
     try:
         async for kind, payload in _stream_chat(doc_id, message.content, history, mode):
             if kind == "text":
                 token = payload.get("text", "")
-                answer.content += token
-                await answer.stream_token(token)
+                if not token:
+                    continue
+                msg = await _ensure_message()
+                await msg.stream_token(token)
             elif kind == "refusal":
                 is_refusal = True
-                answer.content = payload.get("text", REFUSAL_STRING)
-                await answer.update()
+                refusal_text = payload.get("text", REFUSAL_STRING)
+                msg = await _ensure_message()
+                # Stream the refusal as a single token so we only have ONE
+                # render path (stream_token) — no .content mutation, no .update()
+                # race with the initial empty send().
+                await msg.stream_token(refusal_text)
             elif kind == "warning":
                 warnings_collected.append(payload.get("text", ""))
             elif kind == "citation":
@@ -339,14 +355,21 @@ async def on_message(message: cl.Message) -> None:
         await cl.ErrorMessage(content=f"Stream failed: {e}").send()
         return
 
+    # If nothing came back at all (rare edge case — error before any event),
+    # send a fallback so the user isn't staring at a blank pane.
+    if answer is None:
+        answer = cl.Message(content="(no response)")
+        await answer.send()
+
     if not is_refusal and citation_elements:
         answer.elements = citation_elements
     if warnings_collected and not is_refusal:
-        answer.content += "\n\n---\n" + "\n".join(warnings_collected)
+        # Append the warnings as additional streamed tokens (one consistent path).
+        await answer.stream_token("\n\n---\n" + "\n".join(warnings_collected))
     await answer.update()
 
     history.append({"role": "user", "content": message.content})
-    history.append({"role": "assistant", "content": answer.content})
+    history.append({"role": "assistant", "content": answer.content or ""})
     cl.user_session.set("history", history[-20:])
 
 

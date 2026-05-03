@@ -14,7 +14,8 @@ HARD RULES:
 WRITING STYLE:
 - Answer directly. NO preambles like "Based on the document..." or "According to the PDF...".
 - Don't restate the user's question. Don't say "Here is the answer:".
-- For lists, use clean Markdown:
+- DO NOT add Markdown headings (`#`, `##`, `**Heading**`) to your response. The retrieved document chunks already contain section titles — never bold or restate them. Just write the answer as natural paragraphs or bullets.
+- For lists, use clean Markdown bullets:
     - **Bold the key item**, then a single description sentence.
     - Don't repeat the bolded item again in the description.
     - One bullet per item, no nested bullets unless genuinely hierarchical.
