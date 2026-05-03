@@ -1,0 +1,99 @@
+# Sample queries for the PDF-Constrained Conversational RAG Agent.
+#
+# Two PDFs are recommended:
+#   1. Docling arXiv paper (English; tables + equations + figures + multi-column)
+#      Download: curl -L -o eval/data/docling.pdf https://arxiv.org/pdf/2501.17887
+#   2. RBI Annual Report 2022-23 (English + Hindi; multi-page financial tables)
+#      Download: see https://www.rbi.org.in/Scripts/AnnualReportMainDisplay.aspx
+#
+# The eval script (eval/run_eval.py) requires you to ingest the relevant PDF first
+# and pass the resulting doc_id via --doc-id (or set DEFAULT_DOC_ID env var).
+
+datasets:
+  docling_arxiv:
+    description: >
+      Docling: An Efficient Open-Source Toolkit for AI-driven Document Conversion (arXiv:2501.17887).
+      Single-language English. Stresses tables, equations, figures, and multi-column layout.
+    pdf_url: https://arxiv.org/pdf/2501.17887
+    valid_queries:
+      - id: docling-1
+        query: "What dataset does Docling's TableFormer use for table structure recognition?"
+        expected_behavior: |
+          The agent quotes the dataset name (e.g. PubTabNet / FinTabNet / TableBank / DocLayNet)
+          and cites the methods/architecture section with a page number.
+        must_cite_pages_in_range: [1, 12]
+        must_be_refusal: false
+
+      - id: docling-2
+        query: "List the export formats supported by DoclingDocument."
+        expected_behavior: |
+          The agent returns a bulleted list (Markdown, HTML, JSON, etc.) and cites the section
+          describing DoclingDocument outputs.
+        must_cite_pages_in_range: [1, 12]
+        must_be_refusal: false
+
+      - id: docling-3
+        query: "What is the average conversion time per page reported in the benchmarks?"
+        expected_behavior: |
+          The agent quotes the exact number from the benchmarks table with units (seconds/page)
+          and cites the table chunk.
+        must_cite_pages_in_range: [1, 12]
+        must_be_refusal: false
+
+      - id: docling-4
+        query: "Show me the figure that sketches Docling's pipeline."
+        expected_behavior: |
+          The agent identifies Figure 1 (or whichever figure depicts the architecture) and quotes
+          the caption verbatim, citing the figure caption chunk.
+        must_cite_pages_in_range: [1, 12]
+        must_be_refusal: false
+
+      - id: docling-5
+        query: "Summarize the document's main contributions."
+        expected_behavior: |
+          A concise multi-sentence summary that cites at least 2 different pages/sections.
+          (Phase 1 uses flat retrieval — the answer may be less holistic until RAPTOR lands in Phase 2.)
+        must_cite_pages_in_range: [1, 12]
+        must_be_refusal: false
+
+    out_of_scope_queries:
+      - id: docling-oos-1
+        query: "What is Docling's market share compared to Adobe Acrobat in 2025?"
+        expected_behavior: "Refuse with the exact refusal string."
+        must_be_refusal: true
+
+      - id: docling-oos-2
+        query: "How does Docling compare to Reducto on the RD-TableBench benchmark?"
+        expected_behavior: |
+          The Docling paper does not benchmark against Reducto on RD-TableBench. Refuse.
+        must_be_refusal: true
+
+      - id: docling-oos-3
+        query: "Translate the entire abstract into Mandarin."
+        expected_behavior: |
+          A pure translation request is outside the agent's grounding scope. Refuse.
+        must_be_refusal: true
+
+  rbi_bilingual:
+    description: >
+      RBI Annual Report 2022-23 (English + Hindi). Bonus multilingual eval — verifies that
+      cross-lingual retrieval works (English query → Hindi chunks, citations preserved).
+    pdf_url: https://www.rbi.org.in/Scripts/AnnualReportMainDisplay.aspx
+    valid_queries:
+      - id: rbi-1
+        query: "What was the RBI's stance on monetary policy during 2022-23?"
+        expected_behavior: "Cited paragraphs from the monetary policy section, English."
+        must_be_refusal: false
+
+      - id: rbi-2
+        query: "मुद्रास्फीति लक्ष्य क्या है?"  # "What is the inflation target?"
+        expected_behavior: |
+          Reply in Hindi (matching question language); cite the Hindi or English source page.
+          BGE-M3 handles cross-lingual embeddings natively.
+        must_be_refusal: false
+
+    out_of_scope_queries:
+      - id: rbi-oos-1
+        query: "What is the current BTC price?"
+        expected_behavior: "Refuse with the exact refusal string."
+        must_be_refusal: true
